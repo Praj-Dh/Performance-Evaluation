@@ -1,0 +1,583 @@
+{
+  "info": {
+    "_postman_id": "7a4fcf02-8c45-4d32-9468-37f88514a6ce",
+    "name": "Peers Calendar Backend Tests (Desktop Scenarios)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Backend-only validation schema for Peers + Shared Calendar + Dashboard navigation scenarios."
+  },
+  "item": [
+    {
+      "name": "Test 1 - Peers page + Shared Calendar render",
+      "item": [
+        {
+          "name": "1.1 Sign in as employee",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{employee_email}}\",\n  \"password\": \"{{employee_password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{base_url}}/api/login.php"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Login status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "const data = pm.response.json();",
+                  "pm.test('Login success payload returned', function () {",
+                  "  pm.expect(data.success).to.eql(true);",
+                  "  pm.expect(data.user.role).to.eql('employee');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "1.2 Verify session user",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/me.php"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Session endpoint status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "const data = pm.response.json();",
+                  "pm.test('Session user is employee', function () {",
+                  "  pm.expect(data).to.have.property('user');",
+                  "  pm.expect(data.user.role).to.eql('employee');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "1.3 Load peers route HTML",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/peers/"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Peers route responds with 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "const html = pm.response.text();",
+                  "pm.test('Peers page HTML contains Shared Calendar title', function () {",
+                  "  pm.expect(html).to.include('Shared Calendar');",
+                  "});",
+                  "pm.test('Task card: Highlight important dates present', function () {",
+                  "  pm.expect(html).to.include('Highlight important dates');",
+                  "});",
+                  "pm.test('Task card: Comment on a date present', function () {",
+                  "  pm.expect(html).to.include('Comment on a date');",
+                  "});",
+                  "pm.test('Task card: Review team context present', function () {",
+                  "  pm.expect(html).to.include('Review team context');",
+                  "});",
+                  "pm.test('Month navigation arrows are present', function () {",
+                  "  const hasPrev = html.includes('‹') || html.includes('&lsaquo;') || html.includes('aria-label=\"Previous month\"');",
+                  "  const hasNext = html.includes('›') || html.includes('&rsaquo;') || html.includes('aria-label=\"Next month\"');",
+                  "  pm.expect(hasPrev && hasNext).to.eql(true);",
+                  "});",
+                  "pm.test('No fatal UI error signature appears in HTML shell', function () {",
+                  "  pm.expect(/application error|uncaught|exception|stack trace/i.test(html)).to.eql(false);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "1.4 Load shared calendar month payload",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/shared-calendar.php?month={{test_month}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Shared calendar API status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "const data = pm.response.json();",
+                  "pm.test('Shared Calendar section metadata exists', function () {",
+                  "  pm.expect(data.section_title).to.eql('Shared Calendar');",
+                  "  pm.expect(data.task_cards.highlight_important_dates).to.eql('Highlight important dates');",
+                  "  pm.expect(data.task_cards.comment_on_a_date).to.eql('Comment on a date');",
+                  "  pm.expect(data.task_cards.review_team_context).to.eql('Review team context');",
+                  "});",
+                  "pm.test('Date grid exists and has selectable cells', function () {",
+                  "  pm.expect(Array.isArray(data.days)).to.eql(true);",
+                  "  pm.expect(data.days.length).to.be.at.least(28);",
+                  "  pm.expect(data.days.some(function (d) { return d.is_selectable === true; })).to.eql(true);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Test 2 - Mark/unmark important date persistence",
+      "item": [
+        {
+          "name": "2.1 Mark test date as important",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"date\": \"{{test_date}}\",\n  \"important\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{base_url}}/api/shared-calendar.php"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Mark important returns 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "const data = pm.response.json();",
+                  "pm.test('Mark important reports success', function () {",
+                  "  pm.expect(data.success).to.eql(true);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "2.2 Verify important date persists",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/shared-calendar.php?month={{test_month}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Calendar payload status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "const data = pm.response.json();",
+                  "const targetDate = pm.collectionVariables.get('test_date') || pm.environment.get('test_date');",
+                  "const hits = (data.days || []).filter(function (d) { return d.date === targetDate; });",
+                  "pm.test('Target date exists in month payload', function () {",
+                  "  pm.expect(hits.length).to.be.greaterThan(0);",
+                  "});",
+                  "pm.test('Target date flagged important', function () {",
+                  "  pm.expect(hits.some(function (d) { return d.is_important === true; })).to.eql(true);",
+                  "});",
+                  "pm.test('No duplicate date cells for target date', function () {",
+                  "  pm.expect(hits.length).to.eql(1);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "2.3 Unmark test date",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"date\": \"{{test_date}}\",\n  \"important\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{base_url}}/api/shared-calendar.php"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Unmark important returns 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "const data = pm.response.json();",
+                  "pm.test('Unmark important reports success', function () {",
+                  "  pm.expect(data.success).to.eql(true);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "2.4 Verify unmark persisted",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/shared-calendar.php?month={{test_month}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Calendar payload status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "const data = pm.response.json();",
+                  "const targetDate = pm.collectionVariables.get('test_date') || pm.environment.get('test_date');",
+                  "const day = (data.days || []).find(function (d) { return d.date === targetDate; });",
+                  "pm.test('Target date still present', function () {",
+                  "  pm.expect(day).to.exist;",
+                  "});",
+                  "if (day) {",
+                  "  pm.test('Important indicator removed after unmark', function () {",
+                  "    pm.expect(day.is_important).to.eql(false);",
+                  "  });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Test 3 - Add/remove comments and blank validation",
+      "item": [
+        {
+          "name": "3.1 Add comment on test date",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const msg = `Team meeting preparation ${new Date().toISOString()}`;",
+                  "pm.collectionVariables.set('comment_text', msg);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Add comment status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "const data = pm.response.json();",
+                  "pm.test('Comment create success payload', function () {",
+                  "  pm.expect(data.success).to.eql(true);",
+                  "  pm.expect(data.comment).to.have.property('id');",
+                  "  pm.expect(data.comment.comment).to.eql(pm.collectionVariables.get('comment_text'));",
+                  "});",
+                  "pm.collectionVariables.set('created_comment_id', String(data.comment.id));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"date\": \"{{test_date}}\",\n  \"comment\": \"{{comment_text}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{base_url}}/api/calendar-comments.php"
+          }
+        },
+        {
+          "name": "3.2 Verify comment persists",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/calendar-comments.php?date={{test_date}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Comments list status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "const data = pm.response.json();",
+                  "const commentId = Number(pm.collectionVariables.get('created_comment_id'));",
+                  "const target = (data.comments || []).find(function (c) { return Number(c.id) === commentId; });",
+                  "pm.test('Created comment is present', function () {",
+                  "  pm.expect(target).to.exist;",
+                  "});",
+                  "if (target) {",
+                  "  pm.test('Comment has author and timestamp metadata', function () {",
+                  "    pm.expect(target.author_name).to.be.a('string').and.to.not.equal('');",
+                  "    pm.expect(target.created_at).to.be.a('string').and.to.not.equal('');",
+                  "  });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "3.3 Delete comment",
+          "request": {
+            "method": "DELETE",
+            "url": "{{base_url}}/api/calendar-comments.php?comment_id={{created_comment_id}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Delete comment status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "const data = pm.response.json();",
+                  "pm.test('Delete comment returns success', function () {",
+                  "  pm.expect(data.success).to.eql(true);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "3.4 Verify comment removed",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/calendar-comments.php?date={{test_date}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Comments list status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "const data = pm.response.json();",
+                  "const commentId = Number(pm.collectionVariables.get('created_comment_id'));",
+                  "const stillThere = (data.comments || []).some(function (c) { return Number(c.id) === commentId; });",
+                  "pm.test('Deleted comment no longer appears', function () {",
+                  "  pm.expect(stillThere).to.eql(false);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "3.5 Reject blank comment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"date\": \"{{test_date}}\",\n  \"comment\": \"   \"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{base_url}}/api/calendar-comments.php"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Blank comment is rejected with 400', function () {",
+                  "  pm.response.to.have.status(400);",
+                  "});",
+                  "const data = pm.response.json();",
+                  "pm.test('Validation message indicates empty comment not allowed', function () {",
+                  "  pm.expect(/empty|blank|required/i.test(data.error || '')).to.eql(true);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Test 4 - Dashboard route health (logo target)",
+      "item": [
+        {
+          "name": "4.1 Open dashboard route",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/dashboard/"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Dashboard route responds with 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "const html = pm.response.text();",
+                  "pm.test('Dashboard page shell contains dashboard label', function () {",
+                  "  pm.expect(/dashboard/i.test(html)).to.eql(true);",
+                  "});",
+                  "pm.test('No route-level fatal error signature appears', function () {",
+                  "  pm.expect(/application error|uncaught|exception|stack trace/i.test(html)).to.eql(false);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4.2 Verify session still authenticated",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/me.php"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Session remains valid', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4.3 Logout",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/logout.php"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Logout succeeds', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "const data = pm.response.json();",
+                  "pm.test('Logout payload success true', function () {",
+                  "  pm.expect(data.success).to.eql(true);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "employee_email",
+      "value": "morgan.lee.0@example.com"
+    },
+    {
+      "key": "employee_password",
+      "value": "Password123!"
+    },
+    {
+      "key": "test_date",
+      "value": "2026-03-18"
+    },
+    {
+      "key": "test_month",
+      "value": "2026-03"
+    },
+    {
+      "key": "comment_text",
+      "value": ""
+    },
+    {
+      "key": "created_comment_id",
+      "value": ""
+    }
+  ]
+}

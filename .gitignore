@@ -1,0 +1,16 @@
+node_modules/
+.next/
+out/
+.env
+
+# Dev script logs
+.dev-logs/
+
+# Deploy staging (scripts/deploy-to-test.sh)
+.deploy-staging/
+
+# Captured emails in development (when mail() doesn't deliver)
+backend/.mail-capture/
+
+# Mail log lives in system temp (cse442p-mail.log) on server
+.pm-tool/*

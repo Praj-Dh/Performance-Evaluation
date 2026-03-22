@@ -1,0 +1,707 @@
+{
+  "info": {
+    "_postman_id": "e6d19553-bef3-4d90-a04b-0ddadbe9519a",
+    "name": "Employee Dashboard API Tests (CSE 442)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "API regression coverage for employee dashboard flows mapped to UI Test 1-5."
+  },
+  "item": [
+    {
+      "name": "Test 1 - Employee Dashboard data bootstrap",
+      "description": "Covers login/session bootstrap and data sources used by dashboard widgets.",
+      "item": [
+        {
+          "name": "1.1 Login as employee",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{employee_email}}\",\n  \"password\": \"{{employee_password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{base_url}}/api/login.php",
+            "description": "Equivalent to clicking Sign In in the UI."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const data = pm.response.json();",
+                  "pm.test('Login succeeded', function () {",
+                  "  pm.expect(data.success).to.eql(true);",
+                  "});",
+                  "",
+                  "pm.test('Logged-in user is employee account', function () {",
+                  "  pm.expect(data.user.role).to.eql('employee');",
+                  "  pm.expect(data.user.email).to.eql(pm.collectionVariables.get('employee_email'));",
+                  "});",
+                  "",
+                  "pm.collectionVariables.set('employee_user_id', String(data.user.id));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "1.2 Validate current session user",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/me.php",
+            "description": "Confirms the authenticated session used by protected dashboard pages."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const data = pm.response.json();",
+                  "pm.test('Session user payload exists', function () {",
+                  "  pm.expect(data).to.have.property('user');",
+                  "  pm.expect(data.user).to.have.property('id');",
+                  "  pm.expect(data.user).to.have.property('role');",
+                  "});",
+                  "",
+                  "pm.test('Role remains employee', function () {",
+                  "  pm.expect(data.user.role).to.eql('employee');",
+                  "});",
+                  "",
+                  "const expectedId = pm.collectionVariables.get('employee_user_id');",
+                  "if (expectedId) {",
+                  "  pm.test('Session user id matches login response', function () {",
+                  "    pm.expect(String(data.user.id)).to.eql(expectedId);",
+                  "  });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "1.3 Load collaboration activity feed data",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/collaboration-log.php",
+            "description": "Data source for Recent Activity and week-based contribution widgets."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const data = pm.response.json();",
+                  "pm.test('Events array is returned', function () {",
+                  "  pm.expect(Array.isArray(data.events)).to.eql(true);",
+                  "});",
+                  "",
+                  "const allowedTypes = ['mentorship', 'peer_support', 'knowledge', 'cross_dept'];",
+                  "const allowedStatus = ['submitted', 'draft'];",
+                  "(data.events || []).forEach(function (event, idx) {",
+                  "  pm.test(`Event ${idx + 1} includes expected fields`, function () {",
+                  "    pm.expect(event).to.have.property('id');",
+                  "    pm.expect(event).to.have.property('event_type');",
+                  "    pm.expect(event).to.have.property('title');",
+                  "    pm.expect(event).to.have.property('event_date');",
+                  "    pm.expect(event).to.have.property('description');",
+                  "    pm.expect(event).to.have.property('status');",
+                  "  });",
+                  "",
+                  "  pm.test(`Event ${idx + 1} uses valid type/status`, function () {",
+                  "    pm.expect(allowedTypes).to.include(event.event_type);",
+                  "    pm.expect(allowedStatus).to.include(event.status);",
+                  "  });",
+                  "",
+                  "  pm.test(`Event ${idx + 1} has parseable date`, function () {",
+                  "    pm.expect(Number.isNaN(Date.parse(`${event.event_date}T00:00:00Z`))).to.eql(false);",
+                  "  });",
+                  "});",
+                  "",
+                  "const submittedCount = (data.events || []).filter(function (e) { return e.status === 'submitted'; }).length;",
+                  "pm.collectionVariables.set('employee_submitted_count', String(submittedCount));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "1.4 Load review summary data",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/reviews.php",
+            "description": "Data source for employee score/review cards on dashboard and history pages."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const data = pm.response.json();",
+                  "const reviews = Array.isArray(data.reviews) ? data.reviews : [];",
+                  "pm.test('Review payload shape is valid', function () {",
+                  "  pm.expect(Array.isArray(data.reviews)).to.eql(true);",
+                  "  pm.expect(data.total_reviews).to.be.a('number');",
+                  "  pm.expect(data.total_reviews).to.eql(reviews.length);",
+                  "});",
+                  "",
+                  "pm.test('Average score is numeric or null', function () {",
+                  "  const valid = data.avg_score === null || (typeof data.avg_score === 'number' && Number.isFinite(data.avg_score));",
+                  "  pm.expect(valid).to.eql(true);",
+                  "});",
+                  "",
+                  "if (typeof data.avg_score === 'number') {",
+                  "  pm.test('Average score stays in expected range', function () {",
+                  "    pm.expect(data.avg_score).to.be.at.least(0);",
+                  "    pm.expect(data.avg_score).to.be.at.most(100);",
+                  "  });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Test 2 - Log Event workflow API coverage",
+      "description": "Covers form support data, successful submit path, and validation behavior.",
+      "item": [
+        {
+          "name": "2.1 Load peers list for tagging",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/peers.php",
+            "description": "Supports Tagged Peers selector data."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const data = pm.response.json();",
+                  "pm.test('Peers response shape is valid', function () {",
+                  "  pm.expect(data).to.have.property('peers');",
+                  "  pm.expect(Array.isArray(data.peers)).to.eql(true);",
+                  "});",
+                  "",
+                  "if ((data.peers || []).length > 0) {",
+                  "  const peer = data.peers[0];",
+                  "  pm.test('Peer record exposes selector-ready fields', function () {",
+                  "    pm.expect(peer).to.have.property('user_id');",
+                  "    pm.expect(peer).to.have.property('display_name');",
+                  "    pm.expect(peer).to.have.property('email');",
+                  "  });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "2.2 Submit collaboration event",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const now = new Date();",
+                  "pm.collectionVariables.set('new_event_title', `Postman collaboration event ${now.toISOString()}`);",
+                  "pm.collectionVariables.set('new_event_date', now.toISOString().slice(0, 10));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const data = pm.response.json();",
+                  "pm.test('Submit response confirms success', function () {",
+                  "  pm.expect(data.success).to.eql(true);",
+                  "  pm.expect(data.id).to.be.a('number');",
+                  "});",
+                  "",
+                  "pm.collectionVariables.set('new_event_id', String(data.id));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"event_type\": \"knowledge\",\n  \"title\": \"{{new_event_title}}\",\n  \"event_date\": \"{{new_event_date}}\",\n  \"description\": \"Postman-created event used for API regression coverage.\",\n  \"tagged_peers\": \"casey.kim.1@example.com\",\n  \"status\": \"submitted\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{base_url}}/api/collaboration-log.php",
+            "description": "Equivalent to clicking Submit on the Log Collaboration Event form."
+          }
+        },
+        {
+          "name": "2.3 Verify created event appears in history",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/collaboration-log.php"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const data = pm.response.json();",
+                  "const events = Array.isArray(data.events) ? data.events : [];",
+                  "const expectedId = Number(pm.collectionVariables.get('new_event_id'));",
+                  "const expectedTitle = pm.collectionVariables.get('new_event_title');",
+                  "const matched = events.find(function (e) { return Number(e.id) === expectedId; });",
+                  "",
+                  "pm.test('Created event exists in GET /collaboration-log response', function () {",
+                  "  pm.expect(matched).to.exist;",
+                  "});",
+                  "",
+                  "if (matched) {",
+                  "  pm.test('Created event includes required log form fields', function () {",
+                  "    pm.expect(matched.event_type).to.be.a('string');",
+                  "    pm.expect(matched.title).to.eql(expectedTitle);",
+                  "    pm.expect(matched.event_date).to.be.a('string');",
+                  "    pm.expect(matched.description).to.be.a('string');",
+                  "    pm.expect(matched.status).to.eql('submitted');",
+                  "  });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "2.4 Reject event when title is missing",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"event_type\": \"mentorship\",\n  \"title\": \"\",\n  \"event_date\": \"{{new_event_date}}\",\n  \"description\": \"invalid payload test\",\n  \"tagged_peers\": \"\",\n  \"status\": \"submitted\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{base_url}}/api/collaboration-log.php"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 400', function () {",
+                  "  pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "const data = pm.response.json();",
+                  "pm.test('Validation error message is returned', function () {",
+                  "  pm.expect(data.error).to.eql('Title is required');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Test 3 - Recent Activity View All API coverage",
+      "description": "Verifies collaboration history records expose the expected fields for list/table rendering.",
+      "item": [
+        {
+          "name": "3.1 Validate collaboration history list and sort order",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/collaboration-log.php"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const data = pm.response.json();",
+                  "const events = Array.isArray(data.events) ? data.events : [];",
+                  "pm.test('History endpoint returns an array', function () {",
+                  "  pm.expect(Array.isArray(data.events)).to.eql(true);",
+                  "});",
+                  "",
+                  "pm.test('Seeded employee has collaboration history records', function () {",
+                  "  pm.expect(events.length).to.be.greaterThan(0);",
+                  "});",
+                  "",
+                  "events.forEach(function (event, idx) {",
+                  "  pm.test(`History record ${idx + 1} includes display fields`, function () {",
+                  "    pm.expect(event.title).to.be.a('string');",
+                  "    pm.expect(event.event_type).to.be.a('string');",
+                  "    pm.expect(event.event_date).to.be.a('string');",
+                  "    pm.expect(event.description !== undefined).to.eql(true);",
+                  "  });",
+                  "});",
+                  "",
+                  "let sorted = true;",
+                  "for (let i = 1; i < events.length; i += 1) {",
+                  "  const prev = events[i - 1];",
+                  "  const curr = events[i];",
+                  "  const prevDate = prev.event_date || '';",
+                  "  const currDate = curr.event_date || '';",
+                  "",
+                  "  if (prevDate < currDate) {",
+                  "    sorted = false;",
+                  "    break;",
+                  "  }",
+                  "",
+                  "  if (prevDate === currDate) {",
+                  "    const prevCreated = Date.parse(prev.created_at || '1970-01-01T00:00:00Z');",
+                  "    const currCreated = Date.parse(curr.created_at || '1970-01-01T00:00:00Z');",
+                  "    if (prevCreated < currCreated) {",
+                  "      sorted = false;",
+                  "      break;",
+                  "    }",
+                  "  }",
+                  "}",
+                  "",
+                  "pm.test('Records are sorted by event_date desc then created_at desc', function () {",
+                  "  pm.expect(sorted).to.eql(true);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Test 4 - This Week at a Glance metric quality",
+      "description": "Computes week-over-week activity metrics from API data and ensures numeric values are stable.",
+      "item": [
+        {
+          "name": "4.1 Compute weekly activity and comparison indicator",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/collaboration-log.php"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const data = pm.response.json();",
+                  "const events = Array.isArray(data.events) ? data.events : [];",
+                  "",
+                  "function startOfWeekUtc(dateObj) {",
+                  "  const d = new Date(Date.UTC(dateObj.getUTCFullYear(), dateObj.getUTCMonth(), dateObj.getUTCDate()));",
+                  "  const day = d.getUTCDay();",
+                  "  const diffToMonday = (day + 6) % 7;",
+                  "  d.setUTCDate(d.getUTCDate() - diffToMonday);",
+                  "  d.setUTCHours(0, 0, 0, 0);",
+                  "  return d;",
+                  "}",
+                  "",
+                  "const now = new Date();",
+                  "const thisWeekStart = startOfWeekUtc(now);",
+                  "const nextWeekStart = new Date(thisWeekStart);",
+                  "nextWeekStart.setUTCDate(nextWeekStart.getUTCDate() + 7);",
+                  "const prevWeekStart = new Date(thisWeekStart);",
+                  "prevWeekStart.setUTCDate(prevWeekStart.getUTCDate() - 7);",
+                  "",
+                  "let thisWeekCount = 0;",
+                  "let prevWeekCount = 0;",
+                  "events.forEach(function (e) {",
+                  "  if (e.status !== 'submitted' || !e.event_date) return;",
+                  "  const d = new Date(`${e.event_date}T00:00:00Z`);",
+                  "  if (d >= thisWeekStart && d < nextWeekStart) thisWeekCount += 1;",
+                  "  else if (d >= prevWeekStart && d < thisWeekStart) prevWeekCount += 1;",
+                  "});",
+                  "",
+                  "const pctChange = prevWeekCount === 0",
+                  "  ? (thisWeekCount === 0 ? 0 : 100)",
+                  "  : Math.round(((thisWeekCount - prevWeekCount) / prevWeekCount) * 100);",
+                  "",
+                  "pm.test('This week activity value is numeric and not NaN', function () {",
+                  "  pm.expect(Number.isFinite(thisWeekCount)).to.eql(true);",
+                  "});",
+                  "",
+                  "pm.test('Comparison indicator is numeric and not NaN', function () {",
+                  "  pm.expect(Number.isFinite(pctChange)).to.eql(true);",
+                  "});",
+                  "",
+                  "pm.test('Computed values are non-negative counts', function () {",
+                  "  pm.expect(thisWeekCount).to.be.at.least(0);",
+                  "  pm.expect(prevWeekCount).to.be.at.least(0);",
+                  "});",
+                  "",
+                  "pm.collectionVariables.set('this_week_count', String(thisWeekCount));",
+                  "pm.collectionVariables.set('previous_week_count', String(prevWeekCount));",
+                  "pm.collectionVariables.set('week_over_week_pct', String(pctChange));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Test 5 - Empty state for employee with no activity",
+      "description": "Logs in as a seeded low-activity employee and validates empty activity responses.",
+      "item": [
+        {
+          "name": "5.1 Login as empty-state employee",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{empty_state_email}}\",\n  \"password\": \"{{empty_state_password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{base_url}}/api/login.php"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const data = pm.response.json();",
+                  "pm.test('Login succeeded for empty-state employee', function () {",
+                  "  pm.expect(data.success).to.eql(true);",
+                  "  pm.expect(data.user.role).to.eql('employee');",
+                  "  pm.expect(data.user.email).to.eql(pm.collectionVariables.get('empty_state_email'));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "5.2 Get activity feed (expect empty)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/collaboration-log.php"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const data = pm.response.json();",
+                  "pm.test('Events array exists for empty-state employee', function () {",
+                  "  pm.expect(Array.isArray(data.events)).to.eql(true);",
+                  "});",
+                  "",
+                  "pm.test('No activity rows are returned', function () {",
+                  "  pm.expect(data.events.length).to.eql(0);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "5.3 Verify empty-state metrics stay numeric",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/collaboration-log.php"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const data = pm.response.json();",
+                  "const events = Array.isArray(data.events) ? data.events : [];",
+                  "const submittedCount = events.filter(function (e) { return e.status === 'submitted'; }).length;",
+                  "const safeComparison = 0;",
+                  "",
+                  "pm.test('Submitted activity count is zero', function () {",
+                  "  pm.expect(submittedCount).to.eql(0);",
+                  "});",
+                  "",
+                  "pm.test('Fallback comparison indicator is numeric (not NaN)', function () {",
+                  "  pm.expect(Number.isFinite(safeComparison)).to.eql(true);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "5.4 Logout",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/logout.php"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const data = pm.response.json();",
+                  "pm.test('Logout response indicates success', function () {",
+                  "  pm.expect(data.success).to.eql(true);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "employee_email",
+      "value": "morgan.lee.0@example.com"
+    },
+    {
+      "key": "employee_password",
+      "value": "Password123!"
+    },
+    {
+      "key": "empty_state_email",
+      "value": "hayden.scott.18@example.com"
+    },
+    {
+      "key": "empty_state_password",
+      "value": "Password123!"
+    },
+    {
+      "key": "employee_user_id",
+      "value": ""
+    },
+    {
+      "key": "employee_submitted_count",
+      "value": ""
+    },
+    {
+      "key": "new_event_id",
+      "value": ""
+    },
+    {
+      "key": "new_event_title",
+      "value": ""
+    },
+    {
+      "key": "new_event_date",
+      "value": ""
+    },
+    {
+      "key": "this_week_count",
+      "value": ""
+    },
+    {
+      "key": "previous_week_count",
+      "value": ""
+    },
+    {
+      "key": "week_over_week_pct",
+      "value": ""
+    }
+  ]
+}

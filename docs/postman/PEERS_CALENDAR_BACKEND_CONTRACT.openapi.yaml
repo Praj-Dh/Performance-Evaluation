@@ -1,0 +1,535 @@
+openapi: 3.0.3
+info:
+  title: Peers Shared Calendar Backend Contract
+  version: 1.0.0
+  description: |
+    Backend contract to API-test Peers + Shared Calendar desktop scenarios using Postman or curl.
+
+    Notes:
+    - `login`, `me`, `logout`, and `team_members` are implemented in this repo.
+    - `shared-calendar` and `calendar-comments` are contract endpoints required to fully automate Tests 1-3 from backend only.
+servers:
+  - url: http://localhost:8080
+security:
+  - cookieAuth: []
+paths:
+  /api/login.php:
+    post:
+      summary: Sign in and create session
+      operationId: login
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginSuccess'
+        '400':
+          description: Invalid payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/me.php:
+    get:
+      summary: Current authenticated user
+      operationId: me
+      tags: [Auth]
+      responses:
+        '200':
+          description: Session user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MeResponse'
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/logout.php:
+    post:
+      summary: Destroy current session
+      operationId: logout
+      tags: [Auth]
+      responses:
+        '200':
+          description: Logged out
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success]
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+
+  /api/team_members.php:
+    get:
+      summary: Team member directory payload
+      operationId: teamMembers
+      tags: [Peers]
+      responses:
+        '200':
+          description: Team members list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [team_members]
+                properties:
+                  team_members:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/TeamMember'
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /peers/:
+    get:
+      summary: Peers frontend route (HTML)
+      operationId: peersRoute
+      tags: [FrontendRoute]
+      description: |
+        Route-level smoke check for Task 1. In backend-only automation, assert HTTP 200 and expected HTML tokens.
+      responses:
+        '200':
+          description: Peers page HTML
+          content:
+            text/html:
+              schema:
+                type: string
+
+  /dashboard/:
+    get:
+      summary: Dashboard frontend route (HTML)
+      operationId: dashboardRoute
+      tags: [FrontendRoute]
+      description: |
+        Route-level check used for Task 4 (logo navigation outcome can only be inferred backend-side by dashboard route health).
+      responses:
+        '200':
+          description: Dashboard HTML
+          content:
+            text/html:
+              schema:
+                type: string
+
+  /api/shared-calendar.php:
+    get:
+      summary: Shared calendar month payload
+      operationId: getSharedCalendar
+      tags: [SharedCalendar]
+      description: |
+        Contract endpoint required for full backend-only validation of Tasks 1-3.
+      parameters:
+        - in: query
+          name: month
+          required: true
+          schema:
+            type: string
+            pattern: '^\\d{4}-\\d{2}$'
+            example: '2026-03'
+      responses:
+        '200':
+          description: Calendar month state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SharedCalendarMonthResponse'
+        '400':
+          description: Bad query parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    post:
+      summary: Mark or unmark important date
+      operationId: mutateImportantDate
+      tags: [SharedCalendar]
+      description: Contract endpoint required for Task 2.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ImportantDateMutationRequest'
+      responses:
+        '200':
+          description: Mutation applied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MutationSuccess'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/calendar-comments.php:
+    get:
+      summary: List comments for a calendar date
+      operationId: listCalendarComments
+      tags: [CalendarComments]
+      description: Contract endpoint required for Task 3.
+      parameters:
+        - in: query
+          name: date
+          required: true
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Date comments list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CalendarCommentsResponse'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    post:
+      summary: Add comment to a date
+      operationId: addCalendarComment
+      tags: [CalendarComments]
+      description: Contract endpoint required for Task 3.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddCommentRequest'
+      responses:
+        '200':
+          description: Comment created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AddCommentResponse'
+        '400':
+          description: Validation error (including blank-only comment)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      summary: Delete calendar comment
+      operationId: deleteCalendarComment
+      tags: [CalendarComments]
+      description: Contract endpoint required for Task 3.
+      parameters:
+        - in: query
+          name: comment_id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Comment removed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MutationSuccess'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: PHPSESSID
+
+  schemas:
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+          example: morgan.lee.0@example.com
+        password:
+          type: string
+          example: Password123!
+
+    User:
+      type: object
+      required: [id, email, display_name, role]
+      properties:
+        id:
+          type: integer
+        email:
+          type: string
+        display_name:
+          type: string
+        role:
+          type: string
+          enum: [employee, manager, admin]
+
+    LoginSuccess:
+      type: object
+      required: [success, user]
+      properties:
+        success:
+          type: boolean
+          example: true
+        user:
+          $ref: '#/components/schemas/User'
+
+    MeResponse:
+      type: object
+      required: [user]
+      properties:
+        user:
+          allOf:
+            - $ref: '#/components/schemas/User'
+            - type: object
+              properties:
+                manager_id:
+                  type: integer
+                  nullable: true
+                manager_display_name:
+                  type: string
+                  nullable: true
+
+    TeamMember:
+      type: object
+      required: [id, name, role, department, email]
+      properties:
+        id:
+          type: integer
+        user_id:
+          type: integer
+          nullable: true
+        display_name:
+          type: string
+        name:
+          type: string
+        role:
+          type: string
+        department:
+          type: string
+        email:
+          type: string
+        team_id:
+          type: integer
+          nullable: true
+        team_name:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+
+    SharedCalendarDay:
+      type: object
+      required: [date, day_of_month, is_current_month, is_selectable, is_important, comments_count]
+      properties:
+        date:
+          type: string
+          format: date
+          example: '2026-03-18'
+        day_of_month:
+          type: integer
+          example: 18
+        is_current_month:
+          type: boolean
+          example: true
+        is_selectable:
+          type: boolean
+          example: true
+        is_important:
+          type: boolean
+          example: false
+        comments_count:
+          type: integer
+          minimum: 0
+          example: 1
+
+    SharedCalendarTaskCards:
+      type: object
+      required: [highlight_important_dates, comment_on_a_date, review_team_context]
+      properties:
+        highlight_important_dates:
+          type: string
+          example: Highlight important dates
+        comment_on_a_date:
+          type: string
+          example: Comment on a date
+        review_team_context:
+          type: string
+          example: Review team context
+
+    SharedCalendarMonthResponse:
+      type: object
+      required:
+        - month
+        - month_label
+        - prev_month
+        - next_month
+        - section_title
+        - task_cards
+        - days
+      properties:
+        month:
+          type: string
+          example: '2026-03'
+        month_label:
+          type: string
+          example: March 2026
+        prev_month:
+          type: string
+          example: '2026-02'
+        next_month:
+          type: string
+          example: '2026-04'
+        section_title:
+          type: string
+          example: Shared Calendar
+        task_cards:
+          $ref: '#/components/schemas/SharedCalendarTaskCards'
+        days:
+          type: array
+          minItems: 28
+          items:
+            $ref: '#/components/schemas/SharedCalendarDay'
+
+    ImportantDateMutationRequest:
+      type: object
+      required: [date, important]
+      properties:
+        date:
+          type: string
+          format: date
+          example: '2026-03-18'
+        important:
+          type: boolean
+          description: true = mark important, false = unmark important
+
+    MutationSuccess:
+      type: object
+      required: [success]
+      properties:
+        success:
+          type: boolean
+          example: true
+
+    AddCommentRequest:
+      type: object
+      required: [date, comment]
+      properties:
+        date:
+          type: string
+          format: date
+          example: '2026-03-18'
+        comment:
+          type: string
+          example: Team meeting preparation
+
+    CalendarComment:
+      type: object
+      required: [id, date, comment, author_name, created_at]
+      properties:
+        id:
+          type: integer
+        date:
+          type: string
+          format: date
+        comment:
+          type: string
+        author_name:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    AddCommentResponse:
+      type: object
+      required: [success, comment]
+      properties:
+        success:
+          type: boolean
+          example: true
+        comment:
+          $ref: '#/components/schemas/CalendarComment'
+
+    CalendarCommentsResponse:
+      type: object
+      required: [date, comments]
+      properties:
+        date:
+          type: string
+          format: date
+        comments:
+          type: array
+          items:
+            $ref: '#/components/schemas/CalendarComment'

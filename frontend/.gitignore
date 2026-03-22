@@ -1,0 +1,9 @@
+# Dependencies
+node_modules/
+
+# Next.js build
+.next/
+out/
+
+# Env (optional, keep local overrides out of git)
+.env*.local
